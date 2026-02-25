@@ -1,10 +1,9 @@
 import numpy as np
 from collections import defaultdict
 
-
-def Q_learning(env, num_episodes=10000, alpha=0.3, gamma=0.98, epsilon=0.1):
-    """Off-policy Q-learning for tabular control.
-
+    
+def q_learning(env, num_episodes=5000, alpha=0.3, gamma=0.98, epsilon=0.1):
+    """Off-policy Q-Learning with epsilon-greedy behavior policy.
 Args:
     env: Gymnasium-like environment with discrete action space.
     num_episodes (int): Number of training episodes.
@@ -17,37 +16,40 @@ Returns:
     stats (dict): Episode statistics with keys:
         - "episode_rewards": list of total reward per episode
         - "episode_lengths": list of steps per episode
-"""
-    
+    """
+
     num_actions = env.action_space.n
     Q = defaultdict(lambda: np.zeros(num_actions))
-    
+
     stats = {"episode_rewards": [], "episode_lengths": []}
-    
+
+    def policy(state):
+        if np.random.rand() < epsilon:
+            return np.random.randint(num_actions)
+        return np.argmax(Q[state])
+
     for _ in range(num_episodes):
         state, _ = env.reset()
+
         total_reward = 0
         steps = 0
-        
-        while True:
-            action = policy(Q, state, num_actions, epsilon)
+        done, truncated = False, False
+
+        while not (done or truncated):
+            action = policy(state)
             next_state, reward, done, truncated, _ = env.step(action)
-            
-            best_next_action = np.argmax(Q[next_state])
-            
-            td_target = reward + gamma * Q[next_state][best_next_action]
-            td_error = td_target - Q[state][action]
-            
-            Q[state][action] += alpha * td_error
-            
+
+            best_next = np.max(Q[next_state])
+
+            Q[state][action] += alpha * (
+                reward + gamma * best_next - Q[state][action]
+            )
+
             state = next_state
             total_reward += reward
             steps += 1
-            
-            if done or truncated:
-                break
-        
+
         stats["episode_rewards"].append(total_reward)
         stats["episode_lengths"].append(steps)
-    
+
     return Q, stats
